@@ -1191,4 +1191,4 @@ Les compteurs (seats_sold++, available_seats--)
 La liste des billets
 
 
-Sécurité : Vérifications avant chaque achat (âge, disponibi
+Sécurité : Vérifications avant chaque achat (âge, disponibilités)
