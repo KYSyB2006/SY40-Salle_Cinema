@@ -1,6 +1,3 @@
-//
-// Created by kysyb on 19/12/2025.
-//
 #include <pthread.h>
 
 typedef enum { SEAT_AVAILABLE,
