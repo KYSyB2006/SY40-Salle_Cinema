@@ -1,3 +1,6 @@
+//
+// Created by kysyb on 19/12/2025.
+//
 #include <pthread.h>
 
 typedef enum { SEAT_AVAILABLE,
@@ -73,7 +76,7 @@ typedef struct { TicketNode* head;
                  TicketNode* tail;
                  int size;
                  pthread_mutex_t mutex; // Sécurité thread
-               } TicketQueue;
+               } TicketList;
 
 typedef struct { int id;
                  Screening** screenings; // Tableau dynamique contenant toutes les seances de visionnage du cinema
@@ -84,6 +87,6 @@ typedef struct { int id;
                  int num_movies;
                  Ticket** tickets;
                  int num_tickets;
-                 TicketQueue* kiosk_queue; // queue du guichet automatique
-                 TicketQueue* counter_queue; // queue de l'hotesse
+                 TicketList* kiosk_list; // liste de ticket du guichet automatique
+                 TicketList* counter_list; // queue de l'hotesse
                } Cinema;
