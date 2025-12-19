@@ -1,21 +1,92 @@
-typedef enum { SEAT_AVAILABLE, SEAT_RESERVED, SEAT_SOLD } SeatStatus;
+//
+// Created by kysyb on 19/12/2025.
+//
+#include <pthread.h>
 
-typedef enum { TICKET_VALID, TICKET_USED, TICKET_CANCELLED, TICKET_EXCHANGED } TicketStatus;
+typedef enum { SEAT_AVAILABLE,
+               SEAT_RESERVED,
+               SEAT_SOLD
+             } SeatStatus; //permet de definir la statut d'une place
 
-typedef enum { AGE_ALL, // Tous publics AGE_12, // -12 ans AGE_16, // -16 ans AGE_18 // -18 ans } AgeRating;
+typedef enum { TICKET_VALID,
+               TICKET_USED,
+               TICKET_CANCELLED,
+               TICKET_EXCHANGED
+             } TicketStatus;
 
-typedef struct { int id; int row; int col; SeatStatus status; int ticket_id; // -1 si libre } Seat;
+typedef enum { AGE_ALL, // Tous publics
+               AGE_12, // Deconseille aux moins de 12 ans
+               AGE_16, // Deconseille au moins de 16 ans
+               AGE_18 // Deconseille au moins de18 ans
+             } AgeRating;
 
-typedef struct { int id; char title[100]; int duration_minutes; AgeRating age_rating; char genre[50]; } Movie;
+typedef struct { int id;
+                 int row;
+                 int col;
+                 SeatStatus status;
+                 int ticket_id; // initialiser a -1 si le siege est libre
+               } Seat;
 
-typedef struct { int id; char name[50]; int capacity; Seat* seats; // Tableau dynamique int rows; int cols; int available_seats; } Room;
+typedef struct { int id;
+                 char title[100];
+                 int duration_minutes;
+                 AgeRating age_rating;
+                 char genre[50];
+               } Movie;
 
-typedef struct { int id; Movie* movie; Room* room; time_t start_time; float price; int seats_sold; int seats_reserved; int can_change; // 1 si < 20% vendus } Screening;
+typedef struct { int id;
+                 char name[50];
+                 int capacity;
+                 Seat* seats; // Tableau dynamique contenant tous les sieges de la salle
+                 int rows;
+                 int cols;
+                 int available_seats;
+               } Room;
 
-typedef struct { int id; char customer_name[100]; char email[100]; int age; Screening* screening; int seat_id; TicketStatus status; time_t purchase_time; time_t reservation_time; // 0 si achat direct int is_reservation; } Ticket;
+typedef struct { int id;
+                 Movie* movie;
+                 Room* room;
+                 // date du film
+                 time_t start_time;
+                 float price;
+                 int seats_sold;
+                 int seats_reserved;
+                 int can_change; // prendra la valeur 1 si seats_sold < 20%
+               } Screening;
 
-typedef struct TicketNode { Ticket* ticket; struct TicketNode* next; } TicketNode;
+typedef struct { int id;
+                 char customer_name[50];
+                 char email[50];
+                 int age;
+                 Screening* screening;
+                 int seat_id;
+                 TicketStatus status;
+                 // date de la transaction
+                 time_t purchase_time;
+                 time_t reservation_time; // 0 si achat direct
+                 int is_reservation; //permet de savoir si c'est une reservation de billet ou non
+               } Ticket;
 
-typedef struct { TicketNode* head; TicketNode* tail; int size; pthread_mutex_t mutex; // Sécurité thread } TicketQueue;
+typedef struct TicketNode { Ticket* ticket;
+                            struct TicketNode* next;
+                          } TicketNode;
 
-typedef struct { int id; Screening** screenings; // Tableau dynamique int num_screenings; Room** rooms; int num_rooms; Movie** movies; int num_movies; Ticket** tickets; int num_tickets; TicketQueue* kiosk_queue; // File guichet auto TicketQueue* counter_queue; // File hôtesse } Cinema;
+typedef struct { TicketNode* head;
+                 TicketNode* actual;
+                 TicketNode* tail;
+                 int size;
+                 pthread_mutex_t mutex; // Sécurité thread
+               } TicketQueue;
+
+typedef struct { int id;
+                 Screening** screenings; // Tableau dynamique contenant toutes les seances de visionnage du cinema
+                 int num_screenings;
+                 Room** rooms;
+                 int num_rooms;
+                 Movie** movies;
+                 int num_movies;
+                 Ticket** tickets;
+                 int num_tickets;
+                 TicketQueue* kiosk_queue; // queue du guichet automatique
+                 TicketQueue* counter_queue; // queue de l'hotesse
+               } Cinema;
