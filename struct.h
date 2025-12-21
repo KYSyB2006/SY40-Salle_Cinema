@@ -1,9 +1,9 @@
 //
 // Created by kysyb on 19/12/2025.
 //
-#include <stdio.h>
 #include <pthread.h>
-#include <time.h>
+
+
 typedef enum { SEAT_AVAILABLE,
                SEAT_RESERVED,
                SEAT_SOLD
@@ -42,6 +42,7 @@ typedef struct { int id;
                  int rows;
                  int cols;
                  int available_seats;
+                 int isreserveforevent; //prendra la valeur 1 si reserve pour un evenement special
                } Room;
 
 typedef struct { int id;
@@ -54,6 +55,14 @@ typedef struct { int id;
                  int seats_reserved;
                  int can_change; // prendra la valeur 1 si seats_sold < 20%
                } Screening;
+
+typedef struct { int id;
+                 char eventname[100];
+                 Room* room;
+                 // date du film
+                 time_t start_time;
+                 float eventprice;
+               } EventReservation;
 
 typedef struct { int id;
                  char customer_name[50];
@@ -73,11 +82,24 @@ typedef struct TicketNode { Ticket* ticket;
                           } TicketNode;
 
 typedef struct { TicketNode* head;
-                 TicketNode* actualticket;
+                 TicketNode* actual;
                  TicketNode* tail;
                  int size;
                  pthread_mutex_t mutex; // Sécurité thread
                } TicketList;
+
+typedef struct {
+                 int total_tickets_sold;
+                 int total_tickets_reserved;
+                 int total_tickets_cancelled;
+                 int total_ticket_exchanged;
+                 float total_revenue;
+                 float occupancy_rate[50];  //Index = room_id
+                 int tickets_by_movie[100];  // Index = movie_id
+                 int tickets_by_room[50];    // Index = room_id
+                 float avg_waiting_time_kiosk;
+                 float avg_waiting_time_counter;
+               } CinemaStatistics;
 
 typedef struct { int id;
                  Screening** screenings; // Tableau dynamique contenant toutes les seances de visionnage du cinema
@@ -88,6 +110,8 @@ typedef struct { int id;
                  int num_movies;
                  Ticket** tickets;
                  int num_tickets;
-                 TicketList* kiosk_ticket; // ticket du guichet automatique
-                 TicketList* counter_ticket; // ticket de l'hotesse
+                 TicketList* kiosk_list; // liste de ticket du guichet automatique
+                 TicketList* counter_list; // queue de l'hotesse
+                 CinemaStatistics* statistics;
                } Cinema;
+
