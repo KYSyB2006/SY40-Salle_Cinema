@@ -1,16 +1,20 @@
 //
 // Created by kysyb on 19/12/2025.
 //
+#ifndef STRUCT_H
+#define STRUCT_H
 #include <pthread.h>
+#include <time.h>
 
 typedef enum { SEAT_AVAILABLE,
                SEAT_RESERVED,
                SEAT_SOLD
              } SeatStatus; //permet de definir la statut d'une place
 
-typedef enum { TICKET_VALID,
-               TICKET_USED,
+typedef enum { TICKET_VALID, // pour réservation
+               TICKET_SOLD, // pour achat
                TICKET_CANCELLED,
+               TICKET_REFUNDED,
                TICKET_EXCHANGED
              } TicketStatus;
 
@@ -37,7 +41,7 @@ typedef struct { int id;
 typedef struct { int id;
                  char name[50];
                  int capacity;
-                 Seat* seats; // Tableau dynamique contenant tous les sieges de la salle
+                 Seat** seats; // Tableau dynamique contenant tous les sieges de la salle
                  int rows;
                  int cols;
                  int available_seats;
@@ -90,3 +94,5 @@ typedef struct { int id;
                  TicketList* kiosk_list; // liste de ticket du guichet automatique
                  TicketList* counter_list; // queue de l'hotesse
                } Cinema;
+
+#endif //STRUCT_H
