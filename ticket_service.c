@@ -1,4 +1,4 @@
-/* Dans ce fichier, on va définir les fonctions pour l'achat, la réservation,l'échange
+/* Dans ce fichier, on va définir les fonctions pour l'achat,l'échange
     l'annulataion et le remboursement des billets
 */
 #include <stdio.h>
@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include "struct.h"
+#include "ticket_service.h"
 #include "alternatives.h"
 
 //Mutex pour la gestion des billets
