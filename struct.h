@@ -79,7 +79,15 @@ typedef struct { int id;
                  int is_reservation; //permet de savoir si c'est une reservation de billet ou non
                } Ticket;
 
+typedef struct Seat_for_screening
+                          {
+                            Screening* screening;
+                            int* seats_id;
+
+                          };
+
 typedef struct TicketNode { Ticket* ticket;
+                            struct Seat_for_screening** seats_wanted;
                             struct TicketNode* next;
                           } TicketNode;
 
