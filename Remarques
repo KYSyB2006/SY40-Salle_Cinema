@@ -1,0 +1,108 @@
+Voici les fonctions dont on aura besoin aussi dans le cadre de la gestion du cinema, il y'a celle que tu as déjà faite, mais voici celle que je pense qu'on
+doit ajouter pour ne pas avoir la vie difficile quand on va vouloir rassembler les choses
+
+Et si tu fais déjà tout ça, je pourrai facilement tester mes fonctions et on aura une bonne base.
+La signature des fonctions est fausse dont il va falloir adapter en fonction de struct.h
+
+1️⃣ Gestion de la structure du cinéma
+
+Cinema* create_cinema(int id, const char* name, const char* address)
+→ Crée un cinéma vide avec mutex initialisé.
+
+int add_room(Cinema* cinema, Room* room)
+→ Ajoute une salle au cinéma.
+
+int remove_room(Cinema* cinema, int room_id)
+→ Supprime une salle.
+
+Room** list_rooms(Cinema* cinema, int* count)
+→ Renvoie la liste des salles pour exploration.
+
+2️⃣ Gestion des salles (Room)
+
+Room* create_room(int id, const char* name, int rows, int cols)
+→ Initialise une salle avec dimensions.
+
+void init_seats(Room* room)
+→ Crée et numérote les sièges de la salle.
+
+int add_session(Room* room, Session* session)
+→ Ajoute une séance (projection) dans la salle.
+
+int remove_session(Room* room, int session_id)
+→ Supprime une séance de la salle.
+
+int add_event(Room* room, Event* event)
+→ Ajoute un événement spécial (hors film) à la salle.
+
+Seat* get_seat(Session* session, int row, int col)
+→ Accède à un siège spécifique pour lecture ou futur achat/réservation.
+
+3️⃣ Gestion des séances et films (Session / Film)
+
+Session* create_session(int id, int film_id, int room_id, time_t start_time)
+→ Crée une séance vide.
+
+Film* create_film(int id, const char* title, int min_age, int duration)
+→ Crée un film.
+
+Film** list_films(Cinema* cinema, int* count)
+→ Renvoie la liste des films disponibles.
+
+float calculate_occupancy(Session* session)
+→ Calcule le taux de remplissage d’une séance.
+
+4️⃣ Vérification automatique des capacités
+
+bool check_max_capacity(Session* session)
+→ Retourne vrai si remplissage ≥ 90%.
+
+int lock_session(Session* session)
+→ Bloque la vente/réservation si seuil atteint.
+
+int unlock_session(Session* session)
+→ Débloque si nécessaire (ex: réouverture après purge).
+
+void notify_admin_threshold(Session* session)
+→ Notifie l’administrateur ou le serveur qu’un seuil de remplissage est atteint.
+
+5️⃣ Projection flexible (changement dynamique de film)
+
+bool can_switch_film(Session* session, Film* new_film)
+→ Vérifie les conditions :
+
+remplissage actuel < 20%
+
+demande pour new_film > demande pour film actuel.
+
+int switch_film(Session* session, Film* new_film)
+→ Change le film de la séance si can_switch_film renvoie vrai.
+
+void update_dynamic_schedule(Cinema* cinema)
+→ Parcourt toutes les salles et séances pour appliquer les changements de films selon la demande client et les seuils.
+
+6️⃣ Fonctions auxiliaires / utilitaires
+
+void purge_expired_reservations(Session* session)
+→ Supprime les réservations dépassant le TTL.
+
+float occupancy_rate(Room* room)
+→ Calcule le taux de remplissage global d’une salle.
+
+void print_cinema_structure(Cinema* cinema)
+→ Affiche la structure globale pour tests.
+
+void print_room(Room* room)
+→ Affiche la configuration d’une salle (sièges, séances).
+
+void print_session(Session* session)
+→ Affiche les détails d’une séance.
+
+void free_cinema(Cinema* cinema)
+→ Libère la mémoire.
+
+void free_room(Room* room)
+→ Libère la mémoire de la salle.
+
+void free_session(Session* session)
+→ Libère la mémoire de la séance.
