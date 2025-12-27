@@ -2,6 +2,7 @@
 // Created by kysyb on 19/12/2025.
 //
 #include <pthread.h>
+#include <time.h>
 
 
 typedef enum { SEAT_AVAILABLE,
@@ -9,9 +10,10 @@ typedef enum { SEAT_AVAILABLE,
                SEAT_SOLD
              } SeatStatus; //permet de definir la statut d'une place
 
-typedef enum { TICKET_VALID,
-               TICKET_USED,
+typedef enum { TICKET_VALID, // pour réservation
+               TICKET_SOLD, // pour achat
                TICKET_CANCELLED,
+               TICKET_REFUNDED,
                TICKET_EXCHANGED
              } TicketStatus;
 
@@ -48,7 +50,7 @@ typedef struct { int id;
 typedef struct { int id;
                  Movie* movie;
                  Room* room;
-                 // date du film
+                 struct tm film_date;
                  time_t start_time;
                  float price;
                  int seats_sold;
@@ -59,7 +61,7 @@ typedef struct { int id;
 typedef struct { int id;
                  char eventname[100];
                  Room* room;
-                 // date du film
+                 struct tm event_date;
                  time_t start_time;
                  float eventprice;
                } EventReservation;
@@ -71,7 +73,7 @@ typedef struct { int id;
                  Screening* screening;
                  int seat_id;
                  TicketStatus status;
-                 // date de la transaction
+                 struct tm transaction_date;
                  time_t purchase_time;
                  time_t reservation_time; // 0 si achat direct
                  int is_reservation; //permet de savoir si c'est une reservation de billet ou non
