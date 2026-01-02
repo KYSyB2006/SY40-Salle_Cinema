@@ -45,6 +45,7 @@ typedef struct { int id;
                  int rows;
                  int cols;
                  int available_seats;
+                 int for_event;
                } Room;
 
 typedef struct { int id;
@@ -82,6 +83,19 @@ typedef struct { TicketNode* head;
                  pthread_mutex_t mutex; // Sécurité thread
                } TicketList;
 
+typedef struct {
+                 int total_tickets_sold;
+                 int total_tickets_reserved;
+                 int total_tickets_cancelled;
+                 int total_ticket_exchanged;
+                 float total_revenue;
+                 float occupancy_rate[50];  //Index = room_id
+                 int tickets_by_movie[100];  // Index = movie_id
+                 int tickets_by_room[50];    // Index = room_id
+                 float avg_waiting_time_kiosk;
+                 float avg_waiting_time_counter;
+               } CinemaStatistics;
+
 typedef struct { int id;
                  Screening** screenings; // Tableau dynamique contenant toutes les seances de visionnage du cinema
                  int num_screenings;
@@ -93,6 +107,7 @@ typedef struct { int id;
                  int num_tickets;
                  TicketList* kiosk_list; // liste de ticket du guichet automatique
                  TicketList* counter_list; // queue de l'hotesse
+                 CinemaStatistics* statistics;
                } Cinema;
 
 #endif //STRUCT_H
