@@ -40,7 +40,7 @@ typedef struct { int id;
 typedef struct { int id;
                  char name[50];
                  int capacity;
-                 Seat* seats; // Tableau dynamique contenant tous les sieges de la salle
+                 Seat** seats; // Tableau dynamique contenant tous les sieges de la salle
                  int rows;
                  int cols;
                  int available_seats;
@@ -104,7 +104,7 @@ typedef struct {
                  int total_tickets_cancelled;
                  int total_ticket_exchanged;
                  float total_revenue;
-                 float occupancy_rate[50];  //Index = room_id
+                 float occupancy_rate_by_screening[150];  //Index = screening_id
                  int tickets_by_movie[100];  // Index = movie_id
                  int tickets_by_room[50];    // Index = room_id
                  float avg_waiting_time_kiosk;
@@ -114,6 +114,8 @@ typedef struct {
 typedef struct { int id;
                  Screening** screenings; // Tableau dynamique contenant toutes les seances de visionnage du cinema
                  int num_screenings;
+                 Screening* can_change_screening;
+                 int num_can_change_screening;
                  Room** rooms;
                  int num_rooms;
                  Movie** movies;
@@ -125,3 +127,10 @@ typedef struct { int id;
                  CinemaStatistics* statistics;
                } Cinema;
 
+// Structure pour les paramètres d'entrée
+typedef struct {
+    Cinema* cinema;                    // Pointeur vers le cinéma
+    CinemaStatistics** result;         // Pointeur vers où stocker le résultat
+    pthread_mutex_t* mutex;            // Mutex pour protéger l'accès
+    int* status;                       // Code de retour (0=succès, -1=erreur)
+} StatisticsThreadArgs;
