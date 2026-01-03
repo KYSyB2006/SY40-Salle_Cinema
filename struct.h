@@ -5,6 +5,7 @@
 #define STRUCT_H
 #include <pthread.h>
 #include <time.h>
+#include "client.h"
 
 typedef enum { SEAT_AVAILABLE,
                SEAT_RESERVED,
@@ -105,9 +106,11 @@ typedef struct { int id;
                  int num_movies;
                  Ticket** tickets;
                  int num_tickets;
+                 TicketList* reservation_list; // liste des reservations
                  TicketList* kiosk_list; // liste de ticket du guichet automatique
                  TicketList* counter_list; // queue de l'hotesse
                  CinemaStatistics* statistics;
+                 ClientQueue* client_queue;
                } Cinema;
 
 #endif //STRUCT_H

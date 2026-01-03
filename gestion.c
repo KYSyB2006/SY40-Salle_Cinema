@@ -25,6 +25,8 @@ Cinema* cinema_create(int num_rooms_total){
     memset(cinema->statistics, 0, sizeof(CinemaStatistics));
     cinema->kiosk_list = ticketlist_create();
     cinema->counter_list = ticketlist_create();
+    cinema->reservation_list = ticketlist_create();
+    cinema->client_queue = clientqueue_create();
     return cinema;
 }
 

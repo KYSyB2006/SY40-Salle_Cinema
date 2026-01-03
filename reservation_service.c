@@ -73,7 +73,7 @@ int make_reservation(Cinema* cinema, int screening_id, const char* name, const c
     screening->seats_reserved += 1;
 
     //Ajout à la liste des tickets de hotesse
-    pthread_mutex_lock(&cinema->counter_list->mutex);
+    pthread_mutex_lock(&cinema->reservation_list->mutex);
 
     //Création du noeud
     TicketNode* rnode = (TicketNode*)malloc(sizeof(TicketNode));
@@ -81,18 +81,18 @@ int make_reservation(Cinema* cinema, int screening_id, const char* name, const c
     rnode->next = NULL;
     
     // Ajout à la liste
-    if(cinema->counter_list->head == NULL) {
-        cinema->counter_list->head = rnode;
+    if(cinema->reservation_list->head == NULL) {
+        cinema->reservation_list->head = rnode;
     } else {
-        TicketNode* current = cinema->counter_list->head;
+        TicketNode* current = cinema->reservation_list->head;
         while(current->next != NULL) {
             current = current->next;
         }
         current->next = rnode;
     }
-    cinema->counter_list->size += 1;
+    cinema->reservation_list->size += 1;
 
-    pthread_mutex_unlock(&cinema->counter_list->mutex);
+    pthread_mutex_unlock(&cinema->reservation_list->mutex);
     pthread_mutex_unlock(&seat_mutex);
 
     return 1;
@@ -100,15 +100,15 @@ int make_reservation(Cinema* cinema, int screening_id, const char* name, const c
 
 // Modification d'une réservation
 int modify_reservation(Cinema* cinema, int ticket_id, int new_screening_id, int new_seat_id) {
-    pthread_mutex_lock(&cinema->counter_list->mutex);
+    pthread_mutex_lock(&cinema->reservation_list->mutex);
 
     //Recherche et récupération de la réservation
-    TicketNode* current = cinema->counter_list->head;
+    TicketNode* current = cinema->reservation_list->head;
     while (current != NULL)
     {
         Ticket* t = current->ticket;
         if(t->id == ticket_id && t->is_reservation && t->status == TICKET_VALID) {
-           pthread_mutex_unlock(&cinema->counter_list->mutex); // pour l'accès pour d'autres op par les autres hotesses
+           pthread_mutex_unlock(&cinema->reservation_list->mutex); // pour l'accès pour d'autres op par les autres hotesses
            pthread_mutex_lock(&seat_mutex);
 
            //off ancien siège et update
@@ -169,17 +169,17 @@ int modify_reservation(Cinema* cinema, int ticket_id, int new_screening_id, int 
         current = current->next;
     }
 
-    pthread_mutex_unlock(&cinema->counter_list->mutex);
+    pthread_mutex_unlock(&cinema->reservation_list->mutex);
     fprintf(stderr, "Modification refusée : réservation %d non trouvée\n", ticket_id);
     return 0;   
 }
 
 // Validation d'une réservation (elle devient un billet)
 int validate_reservation(Cinema* cinema, int ticket_id) {
-    pthread_mutex_lock(&cinema->counter_list->mutex);
+    pthread_mutex_lock(&cinema->reservation_list->mutex);
 
     //retirer la reservation de la liste
-    TicketNode* current = cinema->counter_list->head;
+    TicketNode* current = cinema->reservation_list->head;
     TicketNode* prev = NULL;
     Ticket* r = NULL;
     while (current != NULL)
@@ -188,11 +188,11 @@ int validate_reservation(Cinema* cinema, int ticket_id) {
         if(t->id == ticket_id && t->is_reservation && t->status == TICKET_VALID) {
             //on la retire de la liste
             if(prev == NULL) {
-                cinema->counter_list->head = current->next;
+                cinema->reservation_list->head = current->next;
             } else {
                 prev->next = current->next;
             }
-            cinema->counter_list->size -= 1;
+            cinema->reservation_list->size -= 1;
             r = t;
             free(current);
             break;
@@ -200,7 +200,7 @@ int validate_reservation(Cinema* cinema, int ticket_id) {
         prev = current;
         current = current->next;
     }
-    pthread_mutex_unlock(&cinema->counter_list->mutex);
+    pthread_mutex_unlock(&cinema->reservation_list->mutex);
 
     if(!r) {
         fprintf(stderr, "Validation refusée : réservation %d non trouvée\n", ticket_id);
@@ -237,10 +237,10 @@ int validate_reservation(Cinema* cinema, int ticket_id) {
 
 // Annulation d'une réservation
 int cancel_reservation(Cinema* cinema, int ticket_id){
-    pthread_mutex_lock(&cinema->counter_list->mutex);
+    pthread_mutex_lock(&cinema->reservation_list->mutex);
 
     //retirer la reservation de la liste
-    TicketNode* current = cinema->counter_list->head;
+    TicketNode* current = cinema->reservation_list->head;
     TicketNode* prev = NULL;
     Ticket* r = NULL;
     while (current != NULL)
@@ -249,11 +249,11 @@ int cancel_reservation(Cinema* cinema, int ticket_id){
         if(t->id == ticket_id && t->is_reservation && t->status == TICKET_VALID) {
             //on la retire de la liste
             if(prev == NULL) {
-                cinema->counter_list->head = current->next;
+                cinema->reservation_list->head = current->next;
             } else {
                 prev->next = current->next;
             }
-            cinema->counter_list->size -= 1;
+            cinema->reservation_list->size -= 1;
             r = t;
             free(current);
             break;
@@ -261,7 +261,7 @@ int cancel_reservation(Cinema* cinema, int ticket_id){
         prev = current;
         current = current->next;
     }
-    pthread_mutex_unlock(&cinema->counter_list->mutex);
+    pthread_mutex_unlock(&cinema->reservation_list->mutex);
 
     if(!r) {
         fprintf(stderr, "Annulation refusée : réservation %d non trouvée\n", ticket_id);
