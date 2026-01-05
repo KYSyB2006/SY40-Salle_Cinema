@@ -1,7 +1,6 @@
 #ifndef THREADS_H
 #define THREADS_H
 
-#include "struct.h"
 #include "client.h"
 
 typedef struct {
@@ -30,12 +29,14 @@ typedef struct {
     pthread_mutex_t mutex;
 } TicketIntentionList;
 
-TicketIntentionList* ticketlist_create();
-void push_intention(TicketIntentionList* list, Ticket* ticket);
-Ticket* pop_intention(TicketIntentionList* list);
+TicketIntentionList* ticketlistint_create(void);
+void push_intention(TicketIntentionList* list, TicketIntention* ticket);
+TicketIntention* pop_intention(TicketIntentionList* list);
 
 void* hostess_thread(void* arg);
 void* kiosk_thread(void* arg);
 void* processor_thread(void* arg);
+void* client_thread(void* arg);
+void* client_thread2(void* arg);
 
 #endif

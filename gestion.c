@@ -1,8 +1,10 @@
 #include "gestion.h"
+#include "threads.h"
 
 static volatile int id_cinema=0;
 static volatile int id_room=0;
 static volatile int id_screening=0;
+static volatile int id_eventreservation=0;
 
 // creation du cinema
 Cinema* cinema_create(int num_rooms_total){
@@ -23,8 +25,8 @@ Cinema* cinema_create(int num_rooms_total){
     if (!cinema->statistics) return NULL;
     //initalisation des statistiques à 0
     memset(cinema->statistics, 0, sizeof(CinemaStatistics));
-    cinema->kiosk_list = ticketlist_create();
-    cinema->counter_list = ticketlist_create();
+    cinema->kiosk_list = ticketlistint_create();
+    cinema->counter_list = ticketlistint_create();
     cinema->reservation_list = ticketlist_create();
     cinema->client_queue = clientqueue_create();
     return cinema;
@@ -325,3 +327,77 @@ void update_dynamic_schedule(Cinema* cinema)
             notify_admin_threshold(s);
     }
 }
+
+//création de réservation pour un évènement
+EventReservation* event_reservation_create(Cinema* cinema, const char* eventname, Room* room, struct tm event_date, time_t start_time, float eventprice)
+{
+    EventReservation* event_reservation = (EventReservation*)malloc(sizeof(EventReservation));
+    if (!event_reservation) return NULL;
+
+    event_reservation->id = id_eventreservation++;
+    strncpy(event_reservation->eventname, eventname, sizeof(event_reservation->eventname) - 1);
+    event_reservation->room = room;
+    event_reservation->room->for_event=1;
+    event_reservation->event_date = event_date;
+    event_reservation->start_time = start_time;
+    event_reservation->eventprice = eventprice;
+    cinema->statistics->total_revenue += eventprice;
+    return event_reservation;
+}
+
+//fonction pour la gestion de la libération de place apres un visionnage
+int liberation_places_at_end_screening(Screening* screening)
+{
+    for (int i=0; i<(screening->seats_sold+screening->seats_reserved); i++)
+    {
+        screening->room->seats[i]->status = SEAT_AVAILABLE;
+        screening->room->available_seats = screening->room->capacity;
+        screening->seats_reserved =0;
+        screening->seats_sold = 0;
+
+    }
+
+    return 0;
+}
+
+//fonction pour la gestion de la salle apres reservation pour evenement
+int liberation_room_after_event(Room* room)
+{
+    room->for_event = 0;
+
+    return room->for_event;
+}
+
+/*void* statistics_thread(void* arg)
+{
+    StatisticsThreadArgs* args = (StatisticsThreadArgs*)arg;
+
+    //Generation de statistiques
+    CinemaStatistics* stats = generate_cinemastatistics(args->cinema); 
+}
+
+CinemaStatistics* generate_cinemastatistics(Cinema* cinema)
+{
+    printf("\n\tSTATISTIQUES DU CINEMA\n");
+    printf("\t total des tickets vendus par le cinema: %d\n",cinema->statistics->total_tickets_sold);
+    printf("\t total des tickets reserves: %d\n",cinema->statistics->total_tickets_reserved);
+    printf("\t total des tickets annules: %d\n",cinema->statistics->total_tickets_cancelled);
+    printf("\t total des tickets echanges: %d\n",cinema->statistics->total_ticket_exchanged);
+    printf("\t total des revenus generes par le cinema: %d\n",cinema->statistics->total_revenue);
+    for (int i=0; i<cinema->num_screenings; i++)
+    {
+        printf("\t pourcentage d'occupation de la salle pour le screening d'id %d:,%d \n", i, cinema->statistics->occupancy_rate[i]);
+    }
+    for (int j=0; j<cinema->num_movies; j++)
+    {
+        printf("\t nombre de tickets vendus pour le film d'id %d:,%d \n", j, cinema->statistics->tickets_by_movie[j]);
+    }
+    for (int k=0; k<cinema->num_movies; k++)
+    {
+        printf("\t nombre de tickets vendus pour la salle d'id %d:,%d \n", k, cinema->statistics->tickets_by_room[k]);
+    }
+    printf("\t temps d'attente moyen au guichet automatique: %d\n",cinema->statistics->avg_waiting_time_kiosk);
+    printf("\t temps d'attente moyen chez une hotesse: %d\n",cinema->statistics->avg_waiting_time_counter);
+}
+
+*/

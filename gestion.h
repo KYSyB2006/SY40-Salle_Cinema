@@ -8,6 +8,14 @@
 #include <pthread.h>
 #include "struct.h"
 
+// Structure pour les paramètres d'entrée
+typedef struct {
+    Cinema* cinema;                    // Pointeur vers le cinéma
+    CinemaStatistics** result;         // Pointeur vers où stocker le résultat
+    pthread_mutex_t* mutex;            // Mutex pour protéger l'accès
+    int* status;                       // Code de retour (0=succès, -1=erreur)
+} StatisticsThreadArgs;
+
 Cinema* cinema_create(int num_rooms_total);
 
 
@@ -39,5 +47,11 @@ void notify_admin_threshold(Screening* screening);
 int can_switch_film(Screening* screening);
 int switch_film(Screening* screening, Movie* new_movie);
 void update_dynamic_schedule(Cinema* cinema);
+
+CinemaStatistics* generate_cinemastatistics(Cinema* cinema);
+void* statistics_thread(void* arg);
+int liberation_room_after_event(Room* room);
+int liberation_places_at_end_screening(Screening* screening);
+EventReservation* event_reservation_create(Cinema* cinema, const char* eventname, Room* room, struct tm event_date, time_t start_time, float eventprice);
 
 #endif

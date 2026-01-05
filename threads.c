@@ -1,10 +1,15 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "threads.h"
 #include <unistd.h>
 #include "client.h"
+#include "ticket_service.h"
+#include "reservation_service.h"
+#include "alternatives.h"
+#include "struct.h"
 
 //création de la liste des intentions
-TicketIntentionList* ticketlist_create() {
+TicketIntentionList* ticketlistint_create() {
     TicketIntentionList* list = malloc(sizeof(TicketIntentionList));
     list->head = list->tail = NULL;
     list->size = 0;
@@ -81,6 +86,7 @@ void* hostess_thread(void* arg) {
         push_intention(cinema->counter_list, t);
 
         printf("[HOSTESS] Client %d -> intention ajoutée\n", c->id);
+        free(c);
         usleep(100000);
     }
 }
@@ -109,6 +115,7 @@ void* kiosk_thread(void* arg) {
         push_intention(cinema->kiosk_list, t);
 
         printf("[KIOSK] Client %d -> intention ajoutée\n", c->id);
+        free(c);
         usleep(100000);
     }
 }
@@ -133,38 +140,92 @@ void* processor_thread(void* arg) {
 
         if (!t) { usleep(50000); continue; }
 
-        int result=-1;
-        
-        switch (t->action) {
-            case BUY:
-                result = purchase_ticket(cinema, t->screening_id, t->name, t->email, t->age, t->seat_id);
-                break;
-            case RESERVE:
-                result = reserve_ticket(cinema, t->screening_id, t->name, t->email, t->age, t->seat_id);
-                break;
-            case VALIDATE_RESERVATION:
-                result = validate_reservation(cinema, t->ticket_id);
-                break;
-            case EXCHANGE:
-                result = exchange_ticket(cinema, t->ticket_id, t->new_screening_id, t->new_seat_id);
-                break;
-            case MODIFY_RESERVATION:
-                result = modify_reservation(cinema, t->ticket_id, t->new_screening_id, t->new_seat_id);
-                break;
-            case CANCEL:
-                result = cancel_ticket(cinema, t->ticket_id);
-                break;
-            case CANCEL_RESERVATION:
-                result = cancel_reservation(cinema, t->ticket_id);
-                break;
-            case REFUND:
-                result = refund_ticket(cinema, t->ticket_id);
-                break;
-            default:
-                break;
+        int result=1;
+        AlternativeList* alt=NULL;
+        TicketResult r;
+
+        //achat et echange
+        if(t->action == BUY || t->action == EXCHANGE || t->action == RESERVE || t->action == MODIFY_RESERVATION) {
+            int retry = 0;
+            do {
+                retry = 0;
+
+                switch (t->action) {
+                case BUY:
+                    r = purchase_ticket(cinema, t->screening_id, t->name, t->email, t->age, t->seat_id, &alt);
+                
+                    if ((r == SEAT_UNAVAILABLE || r == AGE_DENIED) && alt && alt->count > 0 ) {
+                        // stratégie simulation : prendre la 1ère alternative
+                        t->screening_id = alt->options[0].screening_id;
+                        t->seat_id = alt->options[0].seat_id;
+                        retry = 1;
+                    }
+                    result=(r==OK);
+                    break;
+                case EXCHANGE:
+                    r = exchange_ticket(cinema, t->ticket_id, t->new_screening_id, t->new_seat_id, &alt);
+
+                    if ((r == SEAT_UNAVAILABLE || r == AGE_DENIED) && alt && alt->count > 0 ) {
+                        // stratégie simulation : prendre la 1ère alternative
+                        t->screening_id = alt->options[0].screening_id;
+                        t->seat_id = alt->options[0].seat_id;
+                        retry = 1;
+                    }
+                    result=(r==OK);
+                    break;
+                case RESERVE:
+                    r = make_reservation(cinema, t->screening_id, t->name, t->email, t->age, t->seat_id, &alt);
+                    if ((r == SEAT_UNAVAILABLE || r == AGE_DENIED) && alt && alt->count > 0 ) {
+                        // stratégie simulation : prendre la 1ère alternative
+                        t->screening_id = alt->options[0].screening_id;
+                        t->seat_id = alt->options[0].seat_id;
+                        retry = 1;
+                    }
+                    result=(r==OK);
+                    break;
+                case MODIFY_RESERVATION:
+                    r = modify_reservation(cinema, t->ticket_id, t->new_screening_id, t->new_seat_id, &alt);
+                    if ((r == SEAT_UNAVAILABLE || r == AGE_DENIED) && alt && alt->count > 0 ) {
+                        // stratégie simulation : prendre la 1ère alternative
+                        t->screening_id = alt->options[0].screening_id;
+                        t->seat_id = alt->options[0].seat_id;
+                        retry = 1;
+                    }
+                    result=(r==OK);
+                    break;
+                default:
+                    r = 0;
+                    break;
+                }
+                if (alt) {
+                    cinema->statistics->alternatives_generated += alt->count;
+                    cinema->statistics->alternatives_used++;
+                    free(alt->options);
+                    free(alt);
+                    alt = NULL;
+                }
+            } while (retry);
+        }
+        else{
+            switch (t->action) {
+                case VALIDATE_RESERVATION:
+                    result = validate_reservation(cinema, t->ticket_id);
+                    break;
+                case CANCEL:
+                    result = cancel_ticket(cinema, t->ticket_id);
+                    break;
+                case CANCEL_RESERVATION:
+                    result = cancel_reservation(cinema, t->ticket_id);
+                    break;
+                case REFUND:
+                    result = refund_ticket(cinema, t->ticket_id);
+                    break;
+                default:
+                    break;
+            }
         }
 
-        printf("[PROCESSOR] Client %d action %d => %s\n",t->client_id, t->action, result ? "OK" : "FAILED");
+        printf("[PROCESSOR] Client %d action %s => %s \n",t->client_id, action_to_string(t->action), result ? "OK" : "FAILED");
 
         free(t);
         usleep(50000);
@@ -172,21 +233,21 @@ void* processor_thread(void* arg) {
     }
 }
 
-//client thread pour les tests
+//client thread pour les tests (client sans réservation)
 void* client_thread(void* arg) {
     Cinema* cinema = (Cinema*)arg;
 
     Client* c = malloc(sizeof(Client));
     if (!c) return NULL;
 
-    c->id = rand() % 10000;
-    c->age = 18 + rand() % 40;
+    c->id = rand() % 100;
+    c->age = 10+ rand() % 20;
     c->has_reservation = 0;
 
     snprintf(c->name, sizeof(c->name), "Client_%d", c->id);
     snprintf(c->email, sizeof(c->email), "client%d@mail.com", c->id);
 
-    int actions = 1 + rand() % 3; // 1 à 3 actions
+    int actions = 1 + rand() % 2; // 1 à 3 actions
 
     for (int i = 0; i < actions; i++) {
 
@@ -197,34 +258,93 @@ void* client_thread(void* arg) {
                 c->action = BUY;
                 break;
             case 1:
-                c->action = RESERVE;
+                c->action = EXCHANGE;
                 break;
             case 2:
-                c->action = VALIDATE_RESERVATION;
+                c->action = CANCEL;
                 break;
             case 3:
-                c->action = MODIFY_RESERVATION;
+                c->action = REFUND;
                 break;
             case 4:
-                c->action = EXCHANGE;
+                c->action = RESERVE;
+                break;
+        }
+
+        c->screening_id = rand() % cinema->num_screenings;
+        c->seat_id = 0;
+
+        c->ticket_id = rand() % 10; // pour les tests
+        c->new_screening_id = rand() % cinema->num_screenings;
+        c->new_seat_id = rand() % cinema->screenings[c->new_screening_id]->room->capacity;
+
+        Client* snapshot = malloc(sizeof(Client));
+        *snapshot = *c;
+
+        enqueue_client(cinema->client_queue, snapshot);
+
+
+        printf("[CLIENT %d] Action %s envoyée\n", c->id, action_to_string(c->action));
+
+        sleep(4); // temps de réflexion
+    }
+
+    printf("[CLIENT %d] Fin des actions\n", c->id);
+    return NULL;
+}
+
+//client avec réservation
+void* client_thread2(void* arg) {
+    Cinema* cinema = (Cinema*)arg;
+
+    Client* c = malloc(sizeof(Client));
+    if (!c) return NULL;
+
+    c->id = 100+rand() % 100;
+    c->age = 10+ rand() % 20;
+    c->has_reservation = 1;
+
+    snprintf(c->name, sizeof(c->name), "Client_%d", c->id);
+    snprintf(c->email, sizeof(c->email), "client%d@mail.com", c->id);
+
+    int actions = 1 + rand() % 2; // 1 à 3 actions
+
+    for (int i = 0; i < actions; i++) {
+
+        int choice = rand() % 4;
+
+        switch (choice) {
+            case 0:
+                c->action = RESERVE;
+                break;
+            case 1:
+                c->action = VALIDATE_RESERVATION;
+                break;
+            case 2:
+                c->action = MODIFY_RESERVATION;
+                break;
+            case 3:
+                c->action = CANCEL_RESERVATION;
                 break;
         }
 
         c->screening_id = rand() % cinema->num_screenings;
         c->seat_id = rand() % cinema->screenings[c->screening_id]->room->capacity;
 
-        c->ticket_id = rand() % 100; // pour les tests
+        c->ticket_id = rand() % 10; // pour les tests
         c->new_screening_id = rand() % cinema->num_screenings;
         c->new_seat_id = rand() % cinema->screenings[c->new_screening_id]->room->capacity;
 
-        enqueue_client(cinema->client_queue, c);
+        Client* snapshot = malloc(sizeof(Client));
+        *snapshot = *c;
 
-        printf("[CLIENT %d] Action %d envoyée\n", c->id, c->action);
+        enqueue_client(cinema->client_queue, snapshot);
 
-        sleep(1); // temps de réflexion
+        printf("[CLIENT %d] Action %s envoyée\n", c->id, action_to_string(c->action));
+
+        sleep(3); // temps de réflexion
     }
 
     printf("[CLIENT %d] Fin des actions\n", c->id);
-    free(c);
     return NULL;
 }

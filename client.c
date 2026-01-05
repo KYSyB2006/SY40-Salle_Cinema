@@ -47,3 +47,18 @@ Client* dequeue_client(ClientQueue* queue) {
     free(temp);
     return client;
 }
+
+//
+const char* action_to_string(int action) {
+    switch (action) {
+        case BUY: return "BUY";
+        case RESERVE: return "RESERVE";
+        case CANCEL: return "CANCEL";
+        case MODIFY_RESERVATION: return "MODIFY_RESERVATION";
+        case VALIDATE_RESERVATION: return "VALIDATE_RESERVATION";
+        case EXCHANGE: return "EXCHANGE";
+        case CANCEL_RESERVATION: return "CANCEL_RESERVATION";
+        case REFUND: return "REFUND";
+        default: return "UNKNOWN";
+    }
+}

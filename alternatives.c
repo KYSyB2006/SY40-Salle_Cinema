@@ -5,6 +5,7 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "alternatives.h"
 
 Seat** list_available_seats(Room* room, int* count) {
@@ -102,240 +103,84 @@ Screening** list_screenings_by_age(Cinema* cinema, int clientAge, int* count) {
     return screenings;
 }
 
-// Gestion des alternatives*
-AlternativeChoice* alternatives(Ticket* ticket, Cinema* cinema) {
-    if(!ticket || !cinema){
+// Gestion des alternatives
+AlternativeList* compute_alternatives(Cinema* cinema, Ticket* ticket,  const char* reason) {
+    if (!cinema || !ticket) return NULL;
+
+    AlternativeList* list = malloc(sizeof(AlternativeList));
+    if (!list) return NULL;
+
+    list->options = NULL;
+    list->count = 0;
+
+    int scr_count;
+    int seat_count;
+
+    // Changer de place (même séance)
+    if(strcmp("seat",reason)==0){
+        Seat** seats = list_available_seats(ticket->screening->room, &seat_count);
+
+        for (int i = 0; i < seat_count; i++) {
+            list->options = realloc(list->options,
+                sizeof(AlternativeOption) * (list->count + 1));
+
+            list->options[list->count++] = (AlternativeOption){
+                .type = ALT_CHANGE_SEAT,
+                .screening_id = ticket->screening->id,
+                .seat_id = seats[i]->id
+            };
+        }
+        free(seats);
+
+        //Changer de séance (même film)
+        Screening** scrs = list_screenings_same_movie(
+            cinema, ticket->screening->movie, &scr_count);
+
+        for (int i = 0; i < scr_count; i++) {
+            int sc;
+            Seat** s = list_available_seats(scrs[i]->room, &sc);
+            for (int j = 0; j < sc; j++) {
+                list->options = realloc(list->options,
+                    sizeof(AlternativeOption) * (list->count + 1));
+
+                list->options[list->count++] = (AlternativeOption){
+                    .type = ALT_CHANGE_SCREENING,
+                    .screening_id = scrs[i]->id,
+                    .seat_id = s[j]->id
+                };
+            }
+            free(s);
+        }
+        free(scrs);
+    }
+    
+    // Changer de film (respect âge)
+    if(strcmp("age",reason)==0){
+        Screening** age_scrs = list_screenings_by_age(
+        cinema, ticket->age, &scr_count);
+
+        for (int i = 0; i < scr_count; i++) {
+            int sc;
+            Seat** s = list_available_seats(age_scrs[i]->room, &sc);
+            for (int j = 0; j < sc; j++) {
+                list->options = realloc(list->options,
+                    sizeof(AlternativeOption) * (list->count + 1));
+
+                list->options[list->count++] = (AlternativeOption){
+                    .type = ALT_CHANGE_MOVIE,
+                    .screening_id = age_scrs[i]->id,
+                    .seat_id = s[j]->id
+                };
+            }
+            free(s);
+        }
+        free(age_scrs);
+    }
+    
+    if (list->count == 0) {
+        free(list);
         return NULL;
     }
 
-    //menu
-    int choice;
-    printf("\nChoisissez une alternative pour votre billet :\n");
-    printf("1. Changer de place (même salle)\n");
-    printf("2. Changer de salle (même film)\n");
-    printf("3. Changer de film (adapté à votre âge)\n");
-    printf("4. Changer de film\n");
-    printf("0. Annuler\n");
-    printf("Votre choix : ");
-    scanf("%d", &choice);
-
-    if(choice == 0) return NULL;
-
-    AlternativeChoice* alt = malloc(sizeof(AlternativeChoice));
-    if (!alt) return NULL;
-
-    //changement de place
-    if(choice==1){
-        int count;
-        Seat** seats = list_available_seats(ticket->screening->room, &count);
-        if(!seats) {
-            printf("Aucune place disponible dans cette salle.\n");
-            free(alt);
-            return NULL;
-        }
-
-        //affichage à l'écran et choix de user
-        for(int i=0; i<count; i++) {
-            printf("%d. Siège ID: %d (Row: %d, Col: %d)\n", i+1, seats[i]->id, seats[i]->row, seats[i]->col);
-        }
-        printf("Choisissez une place : ");
-        scanf("%d", &choice);
-
-        //validation du choix et affectation
-        if(choice < 1 || choice > count) {
-            printf("Choix invalide.\n");
-            free(seats);
-            free(alt);
-            return NULL;
-        }
-
-        alt->screening = ticket->screening;
-        alt->seat = seats[choice - 1];
-        free(seats);
-        return alt;
-    }
-
-    //changement de salle
-    if(choice==2){
-        int count;
-        Screening** screenings = list_screenings_same_movie(cinema, ticket->screening->movie, &count);
-        if(!screenings) {
-            printf("Aucune autre salle disponible pour ce film.\n");
-            free(alt);
-            return NULL;
-        }
-
-        //affichage à l'écran et choix de user
-        for(int i=0; i<count; i++) {
-            printf("%d. Séance ID: %d (Salle: %s, Heure: %s)\n", i+1, screenings[i]->id, screenings[i]->room->name, ctime(&screenings[i]->start_time));
-        }
-        printf("Choisissez une séance : ");
-        scanf("%d", &choice);
-
-        //validation du choix et affectation
-        if(choice < 1 || choice > count) {
-            printf("Choix invalide.\n");
-            free(screenings);
-            free(alt);
-            return NULL;
-        }
-
-        //liste des places disponibles dans la nouvelle salle
-        int seat_count;
-        Seat** seats = list_available_seats(screenings[choice - 1]->room, &seat_count);
-        if(!seats) {
-            printf("Aucune place disponible dans cette salle.\n");
-            free(screenings);
-            free(alt);
-            return NULL;
-        }
-
-        //affichage des places disponibles
-        for(int i=0; i<seat_count; i++) {
-            printf("%d. Siège ID: %d (Row: %d, Col: %d)\n", i+1, seats[i]->id, seats[i]->row, seats[i]->col);
-        }
-        printf("Choisissez une place : ");
-        int seat_choice;
-        scanf("%d", &seat_choice);
-
-        //validation du choix de siège et affectation
-        if(seat_choice < 1 || seat_choice > seat_count) {
-            printf("Choix invalide.\n");
-            free(seats);
-            free(screenings);
-            free(alt);
-            return NULL;
-        }
-
-        alt->screening = screenings[choice - 1];
-        alt->seat = seats[seat_choice - 1];
-
-        free(seats);
-        free(screenings);
-        return alt;
-    }
-
-    //changer de film avec contrainte d'age
-    if(choice==3){
-        int count;
-        Screening** screenings = list_screenings_by_age(cinema, ticket->age, &count);
-        if(!screenings) {
-            printf("Aucun film disponible adapté à votre âge.\n");
-            free(alt);
-            return NULL;
-        }
-
-        //affichage des films et screenings et choix de user
-        //choice nous donne implicitement l'index du screening associé au film choisi
-        for(int i=0; i<count; i++) {
-            printf("%d. Film: %s, Séance ID: %d (Salle: %s, Heure: %s)\n", i+1, screenings[i]->movie->title, screenings[i]->id, screenings[i]->room->name, ctime(&screenings[i]->start_time));
-        }
-        printf("Choisissez un film : ");
-        scanf("%d", &choice);
-
-        //validation du choix et affectation
-        if(choice < 1 || choice > count) {
-            printf("Choix invalide.\n");
-            free(screenings);
-            free(alt);
-            return NULL;
-        }
-
-        //Recherche des places
-        int seat_count;
-        Seat** seats = list_available_seats(screenings[choice - 1]->room, &seat_count);
-        if(!seats) {
-            printf("Aucune place disponible dans cette salle.\n");
-            free(screenings);
-            free(alt);
-            return NULL;
-        }
-
-        //affichage des places disponibles et choix
-        for(int i=0; i<seat_count; i++) {
-            printf("%d. Siège ID: %d (Row: %d, Col: %d)\n", i+1, seats[i]->id, seats[i]->row, seats[i]->col);
-        }
-        printf("Choisissez une place : ");
-        int seat_choice;
-        scanf("%d", &seat_choice);
-
-        //validation du choix de siège et affectation
-        if(seat_choice < 1 || seat_choice > seat_count) {
-            printf("Choix invalide.\n");
-            free(seats);
-            free(screenings);
-            free(alt);
-            return NULL;
-        }
-
-        alt->screening = screenings[choice - 1];
-        alt->seat = seats[seat_choice - 1];
-
-        free(seats);
-        free(screenings);
-        return alt;
-    }
-
-    //changer de film (c'est le mm contenu que le choix 3 juste que on ne filtre pas les screenings)
-    if(choice==4){
-        int count;
-        Screening** screenings = list_screenings(cinema, &count);
-        if(!screenings) {
-            printf("Aucun film disponible.\n");
-            free(alt);
-            return NULL;
-        }
-
-        //affichage des films et screenings et choix de user
-        for(int i=0; i<count; i++) {
-            printf("%d. Film: %s, Séance ID: %d (Salle: %s, Heure: %s)\n", i+1, screenings[i]->movie->title, screenings[i]->id, screenings[i]->room->name, ctime(&screenings[i]->start_time));
-        }
-        printf("Choisissez un film : ");
-        scanf("%d", &choice);
-
-        //validation du choix et affectation
-        if(choice < 1 || choice > count) {
-            printf("Choix invalide.\n");
-            free(screenings);
-            free(alt);
-            return NULL;
-        }
-
-        //Recherche des places
-        int seat_count;
-        Seat** seats = list_available_seats(screenings[choice - 1]->room, &seat_count);
-        if(!seats) {
-            printf("Aucune place disponible dans cette salle.\n");
-            free(screenings);
-            free(alt);
-            return NULL;
-        }
-
-        //affichage des places disponibles et choix
-        for(int i=0; i<seat_count; i++) {
-            printf("%d. Siège ID: %d (Row: %d, Col: %d)\n", i+1, seats[i]->id, seats[i]->row, seats[i]->col);
-        }
-        printf("Choisissez une place : ");
-        int seat_choice;
-        scanf("%d", &seat_choice);
-
-        //validation du choix de siège et affectation
-        if(seat_choice < 1 || seat_choice > seat_count) {
-            printf("Choix invalide.\n");
-            free(seats);
-            free(screenings);
-            free(alt);
-            return NULL;
-        }
-
-        alt->screening = screenings[choice - 1];
-        alt->seat = seats[seat_choice - 1];
-
-        free(seats);
-        free(screenings);
-        return alt;
-    }
-
-    free(alt);
-    return NULL;
+    return list;
 }

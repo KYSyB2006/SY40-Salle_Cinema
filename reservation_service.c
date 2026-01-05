@@ -15,7 +15,6 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include "struct.h"
-#include "ticket_service.h"
 #include "reservation_service.h"
 
 static pthread_mutex_t seat_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -26,7 +25,7 @@ static pthread_mutex_t ticket_mutex = PTHREAD_MUTEX_INITIALIZER;
     elle réprésente une intenttion d'achat stockée sous forme de ticket temporaire.
      Elle devient donc un billet lorsque on fait sa validation
 */
-int make_reservation(Cinema* cinema, int screening_id, const char* name, const char* email, int age, int seat_id) {
+TicketResult make_reservation(Cinema* cinema, int screening_id, const char* name, const char* email, int age, int seat_id, AlternativeList** alt) {
     pthread_mutex_lock(&seat_mutex);
 
     //Recuperation des entités
@@ -39,23 +38,40 @@ int make_reservation(Cinema* cinema, int screening_id, const char* name, const c
     }
 
     Room* room = screening->room;   
-    Seat* seat;
-    for(int i=0; i<room->available_seats; i++) {
+    Seat* seat=NULL;
+    for(int i=0; i<room->capacity; i++) {
         if(room->seats[i]->id == seat_id) {
             seat = room->seats[i];
             break; 
         }
     }
 
+    //Ticket temporaire pour alternatives
+        Ticket temp_ticket;
+        temp_ticket.age = age;
+        temp_ticket.screening = screening;
+
+    //Vérification de la disponibilité du siège
+    if(seat->status != SEAT_AVAILABLE) {
+        fprintf(stderr, "Réservation refusé : siège %d non disponible\n", seat_id);
+        *alt=compute_alternatives(cinema, &temp_ticket, "seat");
+        pthread_mutex_unlock(&cinema->reservation_list->mutex);
+        pthread_mutex_unlock(&seat_mutex);
+        return SEAT_UNAVAILABLE;
+    }
+
     //Verification de l'age
     if(!verify_age(screening->movie, age)) {
         fprintf(stderr, "Réservation refusée : restriction d'âge pour le film %s\n", screening->movie->title);
-        return 0;
+        *alt=compute_alternatives(cinema, &temp_ticket, "age");
+        pthread_mutex_unlock(&cinema->reservation_list->mutex);
+        pthread_mutex_unlock(&seat_mutex);
+        return AGE_DENIED;
     }
 
     //Création de la réservation
     Ticket* reservation = (Ticket*)malloc(sizeof(Ticket));
-    reservation->id = rand(); // Pour ne pas empoisonner avec les billets reels
+    reservation->id = cinema->reservation_list->size +=1; // Pour ne pas empoisonner avec les billets reels
     strncpy(reservation->customer_name, name, 50);
     strncpy(reservation->email, email, 50);
     reservation->age = age;
@@ -72,7 +88,7 @@ int make_reservation(Cinema* cinema, int screening_id, const char* name, const c
     room->available_seats -= 1;
     screening->seats_reserved += 1;
 
-    //Ajout à la liste des tickets de hotesse
+    //Ajout à la liste des tickets de reservation
     pthread_mutex_lock(&cinema->reservation_list->mutex);
 
     //Création du noeud
@@ -92,14 +108,16 @@ int make_reservation(Cinema* cinema, int screening_id, const char* name, const c
     }
     cinema->reservation_list->size += 1;
 
+    cinema->statistics->total_tickets_reserved+=1;
+
     pthread_mutex_unlock(&cinema->reservation_list->mutex);
     pthread_mutex_unlock(&seat_mutex);
 
-    return 1;
+    return OK;
 }
 
 // Modification d'une réservation
-int modify_reservation(Cinema* cinema, int ticket_id, int new_screening_id, int new_seat_id) {
+TicketResult modify_reservation(Cinema* cinema, int ticket_id, int new_screening_id, int new_seat_id, AlternativeList** alt) {
     pthread_mutex_lock(&cinema->reservation_list->mutex);
 
     //Recherche et récupération de la réservation
@@ -108,24 +126,10 @@ int modify_reservation(Cinema* cinema, int ticket_id, int new_screening_id, int 
     {
         Ticket* t = current->ticket;
         if(t->id == ticket_id && t->is_reservation && t->status == TICKET_VALID) {
-           pthread_mutex_unlock(&cinema->reservation_list->mutex); // pour l'accès pour d'autres op par les autres hotesses
+           pthread_mutex_unlock(&cinema->reservation_list->mutex); 
            pthread_mutex_lock(&seat_mutex);
 
-           //off ancien siège et update
-            Room* old_room = t->screening->room;
-            Seat* old_seat = NULL;
-            for(int i=0; i<old_room->available_seats; i++) {
-                if(old_room->seats[i]->id == t->seat_id) {
-                    old_seat = old_room->seats[i];
-                    break;  
-                }
-            }
-            old_seat->status = SEAT_AVAILABLE;
-            old_seat->ticket_id = -1;
-            old_room->available_seats += 1;
-            t->screening->seats_reserved -= 1;
-
-            //on récupère la nouvelle séance
+           //on récupère la nouvelle séance
             Screening* new_screening = NULL;
             for(int i=0; i<cinema->num_screenings; i++) {
                 if(cinema->screenings[i]->id == new_screening_id) {
@@ -141,18 +145,41 @@ int modify_reservation(Cinema* cinema, int ticket_id, int new_screening_id, int 
             // le nouveau siege
             Room* new_room = new_screening->room;
             Seat* new_seat = NULL;
-            for(int i=0; i<new_room->available_seats; i++) {
+            for(int i=0; i<new_room->capacity; i++) {
                 if(new_room->seats[i]->id == new_seat_id) {
                     new_seat = new_room->seats[i];
                     break;
                 }
             }
+            //Vérification de la disponibilité du nouveau siège
+            if(new_seat->status != SEAT_AVAILABLE) {
+                fprintf(stderr, "Modification refusée : siège %d non disponible\n", new_seat_id);
+                *alt=compute_alternatives(cinema, t, "seat");
+                pthread_mutex_unlock(&seat_mutex);
+                return SEAT_UNAVAILABLE;
+            }
             //check age
             if(!verify_age(new_screening->movie, t->age)) {
-                pthread_mutex_unlock(&seat_mutex);
                 fprintf(stderr, "Modification refusée : restriction d'âge pour le film %s\n", new_screening->movie->title);
-                return 0;
+                *alt=compute_alternatives(cinema, t, "age");
+                pthread_mutex_unlock(&seat_mutex);
+                return AGE_DENIED;
             } 
+
+           //off ancien siège et update
+            Room* old_room = t->screening->room;
+            Seat* old_seat = NULL;
+            for(int i=0; i<old_room->available_seats; i++) {
+                if(old_room->seats[i]->id == t->seat_id) {
+                    old_seat = old_room->seats[i];
+                    break;  
+                }
+            }
+            old_seat->status = SEAT_AVAILABLE;
+            old_seat->ticket_id = -1;
+            old_room->available_seats += 1;
+            t->screening->seats_reserved -= 1;
+
             //update
             new_seat->status = SEAT_RESERVED;
             new_seat->ticket_id = t->id;
@@ -163,8 +190,10 @@ int modify_reservation(Cinema* cinema, int ticket_id, int new_screening_id, int 
             t->seat_id = new_seat_id;
             t->reservation_time = time(NULL);
 
+            cinema->statistics->total_rsv_modified+=1;
+
             pthread_mutex_unlock(&seat_mutex);
-            return 1;
+            return OK;
         }
         current = current->next;
     }
@@ -212,7 +241,7 @@ int validate_reservation(Cinema* cinema, int ticket_id) {
     //update des champs
     Seat* seat = NULL;
     Room* room = r->screening->room;
-    for(int i=0; i<room->available_seats; i++) {
+    for(int i=0; i<room->capacity; i++) {
         if(room->seats[i]->id == r->seat_id) {
             seat = room->seats[i];
             break;
@@ -229,6 +258,9 @@ int validate_reservation(Cinema* cinema, int ticket_id) {
     cinema->tickets = (Ticket**)realloc(cinema->tickets, sizeof(Ticket*) * (cinema->num_tickets + 1));
     cinema->tickets[cinema->num_tickets] = r;
     cinema->num_tickets += 1;
+
+    cinema->statistics->total_tickets_sold +=1;
+    cinema->statistics->total_rsv_validated +=1;
 
     pthread_mutex_unlock(&ticket_mutex);
     pthread_mutex_unlock(&seat_mutex);
@@ -272,7 +304,7 @@ int cancel_reservation(Cinema* cinema, int ticket_id){
     //update
     Seat* seat = NULL;
     Room* room = r->screening->room;
-    for(int i=0; i<room->available_seats; i++) {
+    for(int i=0; i<room->capacity; i++) {
         if(room->seats[i]->id == r->seat_id) {
             seat = room->seats[i];
             break;
@@ -285,6 +317,9 @@ int cancel_reservation(Cinema* cinema, int ticket_id){
     r->status = TICKET_CANCELLED; 
     r->screening->seats_reserved -= 1;
     room->available_seats += 1;
+
+    cinema->statistics->total_rsv_cancelled +=1;
+    
     pthread_mutex_unlock(&seat_mutex);
     
     return 1;
