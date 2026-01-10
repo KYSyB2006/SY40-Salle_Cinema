@@ -106,6 +106,7 @@ typedef struct {
                  int alternatives_generated;
                  int alternatives_used;
                  float occupancy_rate[50];  //Index = room_id
+                 float occupancy_rate_by_screening[200]; // Index = screening_id, taux d'occupation par séance
                  int tickets_by_movie[100];  // Index = movie_id
                  int tickets_by_room[50];    // Index = room_id
                  float avg_waiting_time_kiosk;

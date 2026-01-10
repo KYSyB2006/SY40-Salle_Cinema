@@ -4,15 +4,24 @@
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "gestion.h"
 #include "threads.h"
 #include "ticket_service.h"
 #include "reservation_service.h"
 #include "alternatives.h"
+#include "alarm.h"
 
+// Handler pour SIGUSR2 (Alerte capacité 90%)
+void handle_sigusr2(int sig) {
+    printf("\n[ALERTE SYSTÈME] SIGUSR2 - Une séance a atteint 90%% de capacité!\n");
+}
 
 int main() {
+	// Enregistrer le handler pour SIGUSR2
+	signal(SIGUSR2, handle_sigusr2);
+	
 	srand(time(NULL));
 
 	Cinema* cinema = cinema_create(5);
@@ -41,6 +50,13 @@ int main() {
 	cinema->screenings[cinema->num_screenings++] = s2;
 
 	// client_queue déjà initialisée par cinema_create
+	
+	// Initialiser et démarrer le moniteur de capacité (90%)
+	CapacityMonitor* capacity_monitor = capacity_monitor_init(cinema);
+	if (capacity_monitor) {
+		capacity_monitor_start(capacity_monitor, 1000);  // Vérification chaque seconde
+		printf("[SYSTEM] Moniteur de capacité démarré\n");
+	}
 
 	// Threads agents
 	pthread_t hostess[2], kiosk[2], processor;

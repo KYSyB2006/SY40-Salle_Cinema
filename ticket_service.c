@@ -16,6 +16,7 @@
 #include "struct.h"
 #include "ticket_service.h"
 #include "alternatives.h"
+#include "alarm.h"
 
 //Mutex pour la gestion des billets
 static pthread_mutex_t ticket_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -69,6 +70,16 @@ TicketResult purchase_ticket(Cinema* cinema, int screening_id, const char* name,
         return AGE_DENIED;
     }
 
+    // Vérification de la capacité (90%)
+    check_full_capacity_and_alert(cinema, screening_id);
+    if (cinema->statistics->occupancy_rate_by_screening[screening_id] >= 90.0f) {
+        fprintf(stderr, "Achat refusé : séance %d à capacité complète (90%%+)\n", screening_id);
+        *alt = compute_alternatives(cinema, &temp_ticket, "capacity");
+        pthread_mutex_unlock(&ticket_mutex);
+        pthread_mutex_unlock(&seat_mutex);
+        return SEAT_UNAVAILABLE;  // Réutiliser le code SEAT_UNAVAILABLE pour capacité pleine
+    }
+
     //Création du billet
     Ticket* ticket = (Ticket*)malloc(sizeof(Ticket));
     ticket->id = cinema->num_tickets + 1;
@@ -97,6 +108,10 @@ TicketResult purchase_ticket(Cinema* cinema, int screening_id, const char* name,
     cinema->statistics->total_revenue += screening->price;
     cinema->statistics->tickets_by_movie[ticket->screening->movie->id]++;
     cinema->statistics->tickets_by_room[ticket->screening->room->id]++;
+    
+    // Mise à jour du taux d'occupation pour cette séance
+    float occupancy = (float)screening->seats_sold / (float)room->capacity * 100.0f;
+    cinema->statistics->occupancy_rate_by_screening[screening->id] = occupancy;
 
     pthread_mutex_unlock(&ticket_mutex);
     pthread_mutex_unlock(&seat_mutex);
