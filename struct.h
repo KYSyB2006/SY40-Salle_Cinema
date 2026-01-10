@@ -1,22 +1,16 @@
 //
 // Created by kysyb on 19/12/2025.
 //
-#ifndef STRUCT_H
-#define STRUCT_H
 #include <pthread.h>
-#include <time.h>
-#include "client.h"
-#include "threads.h"
 
 typedef enum { SEAT_AVAILABLE,
                SEAT_RESERVED,
                SEAT_SOLD
              } SeatStatus; //permet de definir la statut d'une place
 
-typedef enum { TICKET_VALID, // pour réservation
-               TICKET_SOLD, // pour achat
+typedef enum { TICKET_VALID,
+               TICKET_USED,
                TICKET_CANCELLED,
-               TICKET_REFUNDED,
                TICKET_EXCHANGED
              } TicketStatus;
 
@@ -43,11 +37,10 @@ typedef struct { int id;
 typedef struct { int id;
                  char name[50];
                  int capacity;
-                 Seat** seats; // Tableau dynamique contenant tous les sieges de la salle
+                 Seat* seats; // Tableau dynamique contenant tous les sieges de la salle
                  int rows;
                  int cols;
                  int available_seats;
-                 int for_event;
                } Room;
 
 typedef struct { int id;
@@ -60,14 +53,6 @@ typedef struct { int id;
                  int seats_reserved;
                  int can_change; // prendra la valeur 1 si seats_sold < 20%
                } Screening;
- 
-typedef struct { int id;
-                 char eventname[100];
-                 Room* room;
-                 struct tm event_date;
-                 time_t start_time;
-                 float eventprice;
-               } EventReservation;               
 
 typedef struct { int id;
                  char customer_name[50];
@@ -93,26 +78,6 @@ typedef struct { TicketNode* head;
                  pthread_mutex_t mutex; // Sécurité thread
                } TicketList;
 
-typedef struct {
-                 int total_tickets_sold;
-                 int total_tickets_reserved;
-                 int total_tickets_cancelled;
-                 int total_ticket_exchanged;
-                 int total_ticket_refunded;
-                 float total_revenue;
-                 int total_rsv_modified;
-                 int total_rsv_cancelled;
-                 int total_rsv_validated;
-                 int alternatives_generated;
-                 int alternatives_used;
-                 float occupancy_rate[50];  //Index = room_id
-                 float occupancy_rate_by_screening[200]; // Index = screening_id, taux d'occupation par séance
-                 int tickets_by_movie[100];  // Index = movie_id
-                 int tickets_by_room[50];    // Index = room_id
-                 float avg_waiting_time_kiosk;
-                 float avg_waiting_time_counter;
-               } CinemaStatistics;
-
 typedef struct { int id;
                  Screening** screenings; // Tableau dynamique contenant toutes les seances de visionnage du cinema
                  int num_screenings;
@@ -120,13 +85,8 @@ typedef struct { int id;
                  int num_rooms;
                  Movie** movies;
                  int num_movies;
-                 Ticket** tickets; //les tickets vendus, annules, rembourses, echanges
+                 Ticket** tickets;
                  int num_tickets;
-                 TicketList* reservation_list; // liste des reservations
-                 TicketIntentionList* kiosk_list; // liste de ticket du guichet automatique
-                 TicketIntentionList* counter_list; // queue de l'hotesse
-                 CinemaStatistics* statistics;
-                 ClientQueue* client_queue;
+                 TicketList* kiosk_list; // liste de ticket du guichet automatique
+                 TicketList* counter_list; // queue de l'hotesse
                } Cinema;
-
-#endif //STRUCT_H
