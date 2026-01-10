@@ -40,7 +40,7 @@ static int rank_by_age(Cinema* cinema, AgeRating age, ScreeningRanking* rankings
         }
         if (s && s->movie && s->movie->age_rating == age) {
             rankings[count].screening_id = i;
-            rankings[count].occupancy_rate = cinema->statistics->occupancy_rate_by_screening[i];
+            rankings[count].occupancy_rate = cinema->statistics->tickets_by_movie[s->movie->id];
             rankings[count].age_rating = age;
             rankings[count].screening = s;
             count++;
