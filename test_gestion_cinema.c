@@ -117,6 +117,29 @@ int main(void){
         printf("Failed to switch film for Screening ID %d.\n", test_screening->id);
     }
 
+    // Test pour créer un événement et libérer la salle
+    printf("\n--- Testing Event Reservation and Room Liberation ---\n");
+    
+    // Créer un événement
+    struct tm event_date = *localtime(&start_time);
+    event_date.tm_mday += 7; // Event 7 days from now
+    time_t event_start_time = time(NULL) + 604800; // 7 days in seconds
+    
+    EventReservation* event = event_reservation_create(cinema, "Concert Jazz", rooms[0], event_date, event_start_time, 500.0f);
+    if (event) {
+        printf("Event '%s' created successfully.\n", event->eventname);
+        printf("Event ID: %d, Room: %s, Price: %.2f\n", event->id, event->room->name, event->eventprice);
+        printf("Room '%s' is now reserved for event (for_event = %d).\n", event->room->name, event->room->for_event);
+        
+        // Libérer la salle après l'événement
+        int liberation_result = liberation_room_after_event(event->room);
+        printf("Room '%s' liberation result: %d\n", event->room->name, liberation_result);
+        printf("Room '%s' is now available again (for_event = %d).\n", event->room->name, event->room->for_event);
+        
+        // Libération de la mémoire de l'événement
+        free(event);
+    }
+
     // Nettoyage
     printf("\n Nettoyage et libération de la mémoire.\n");
     //suppression des screenings

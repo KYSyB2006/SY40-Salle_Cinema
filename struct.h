@@ -17,7 +17,8 @@ typedef enum { TICKET_VALID, // pour réservation
                TICKET_SOLD, // pour achat
                TICKET_CANCELLED,
                TICKET_REFUNDED,
-               TICKET_EXCHANGED
+               TICKET_EXCHANGED,
+               TICKET_MOVIE_CHANGED
              } TicketStatus;
 
 typedef enum { AGE_ALL, // Tous publics
@@ -53,7 +54,7 @@ typedef struct { int id;
 typedef struct { int id;
                  Movie* movie;
                  Room* room;
-                 // date du film
+                 time_t created_at;
                  time_t start_time;
                  float price;
                  int seats_sold;
@@ -105,7 +106,7 @@ typedef struct {
                  int total_rsv_validated;
                  int alternatives_generated;
                  int alternatives_used;
-                 float occupancy_rate[50];  //Index = room_id
+                 float occupancy_rate_by_screening[200];  //Index = room_id
                  int tickets_by_movie[100];  // Index = movie_id
                  int tickets_by_room[50];    // Index = room_id
                  float avg_waiting_time_kiosk;

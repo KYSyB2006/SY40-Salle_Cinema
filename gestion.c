@@ -1,5 +1,9 @@
 #include "gestion.h"
 #include "threads.h"
+#include <unistd.h>
+#include <signal.h>
+
+volatile sig_atomic_t system_paused = 0;
 
 static volatile int id_cinema=0;
 static volatile int id_room=0;
@@ -85,6 +89,7 @@ Screening* screening_create(Movie* movie, Room* room, time_t start_time, float p
     screening->movie = movie;
     screening->room = room;
     screening->start_time = start_time;
+    screening->created_at = time(NULL);
     screening->price = price;
     screening->seats_sold = 0;
     screening->seats_reserved = 0;
@@ -316,6 +321,17 @@ int switch_film(Screening* screening, Movie* new_movie)
     screening->movie = new_movie;
     return 1;
 }
+void ticket_movie_changed(Cinema* cinema, Screening* screening){
+    for (int i = 0; i < cinema->num_tickets; i++) {
+        Ticket* t = cinema->tickets[i];
+        if (t->screening == screening &&
+            (t->status == TICKET_SOLD || t->status == TICKET_VALID)) {
+
+            t->status = TICKET_MOVIE_CHANGED;
+        }
+    }
+    printf("[NOTIFY] Des tickets ont impactés par changement de film\n");
+}
 void update_dynamic_schedule(Cinema* cinema)
 {
     if (!cinema) return;
@@ -334,7 +350,7 @@ EventReservation* event_reservation_create(Cinema* cinema, const char* eventname
     EventReservation* event_reservation = (EventReservation*)malloc(sizeof(EventReservation));
     if (!event_reservation) return NULL;
 
-    event_reservation->id = id_eventreservation++;
+    event_reservation->id = id_eventreservation+=1;
     strncpy(event_reservation->eventname, eventname, sizeof(event_reservation->eventname) - 1);
     event_reservation->room = room;
     event_reservation->room->for_event=1;
@@ -348,16 +364,21 @@ EventReservation* event_reservation_create(Cinema* cinema, const char* eventname
 //fonction pour la gestion de la libération de place apres un visionnage
 int liberation_places_at_end_screening(Screening* screening)
 {
-    for (int i=0; i<(screening->seats_sold+screening->seats_reserved); i++)
-    {
-        screening->room->seats[i]->status = SEAT_AVAILABLE;
-        screening->room->available_seats = screening->room->capacity;
-        screening->seats_reserved =0;
-        screening->seats_sold = 0;
+    Room* room = screening->room;
 
+    for (int i = 0; i < room->capacity; i++) {
+        if (room->seats[i]->status != SEAT_AVAILABLE) {
+            room->seats[i]->status = SEAT_AVAILABLE;
+            room->seats[i]->ticket_id = -1;
+        }
     }
 
-    return 0;
+    room->available_seats = room->capacity;
+    screening->seats_sold = 0;
+    screening->seats_reserved = 0;
+    screening->can_change = 1;
+
+    return 1;
 }
 
 //fonction pour la gestion de la salle apres reservation pour evenement

@@ -36,6 +36,18 @@ TicketResult make_reservation(Cinema* cinema, int screening_id, const char* name
             break;
         }
     }
+    //Verification du screening
+    time_t now=time(NULL);
+    if(now>=screening->start_time){
+       fprintf(stderr,"Séance a déjà commencée\n");
+        pthread_mutex_unlock(&seat_mutex);
+        return INVALID; 
+    }
+    if(screening->can_change==0){
+        fprintf(stderr,"Séance pleine\n");
+        pthread_mutex_unlock(&seat_mutex);
+        return INVALID;
+    }
 
     Room* room = screening->room;   
     Seat* seat=NULL;
@@ -109,6 +121,7 @@ TicketResult make_reservation(Cinema* cinema, int screening_id, const char* name
     cinema->reservation_list->size += 1;
 
     cinema->statistics->total_tickets_reserved+=1;
+    cinema->statistics->total_revenue += reservation->screening->price * 0.5;
 
     pthread_mutex_unlock(&cinema->reservation_list->mutex);
     pthread_mutex_unlock(&seat_mutex);
@@ -142,6 +155,19 @@ TicketResult modify_reservation(Cinema* cinema, int ticket_id, int new_screening
                 fprintf(stderr, "Modification refusée : séance %d non trouvée\n", new_screening_id);
                 return 0;
             }
+            //Verification du screening
+            time_t now=time(NULL);
+            if(now>=new_screening->start_time){
+                fprintf(stderr,"Séance a déjà commencée\n");
+                    pthread_mutex_unlock(&seat_mutex);
+                    return INVALID; 
+            }
+            if(new_screening->can_change==0){
+                fprintf(stderr,"Séance pleine\n");
+                pthread_mutex_unlock(&seat_mutex);
+                return INVALID;
+            }
+
             // le nouveau siege
             Room* new_room = new_screening->room;
             Seat* new_seat = NULL;
@@ -261,6 +287,7 @@ int validate_reservation(Cinema* cinema, int ticket_id) {
 
     cinema->statistics->total_tickets_sold +=1;
     cinema->statistics->total_rsv_validated +=1;
+    cinema->statistics->total_revenue += r->screening->price * 0.5;
 
     pthread_mutex_unlock(&ticket_mutex);
     pthread_mutex_unlock(&seat_mutex);
@@ -319,6 +346,7 @@ int cancel_reservation(Cinema* cinema, int ticket_id){
     room->available_seats += 1;
 
     cinema->statistics->total_rsv_cancelled +=1;
+    cinema->statistics->total_revenue -= r->screening->price * 0.5;
     
     pthread_mutex_unlock(&seat_mutex);
     

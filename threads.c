@@ -7,6 +7,9 @@
 #include "reservation_service.h"
 #include "alternatives.h"
 #include "struct.h"
+#include "gestion.h"
+#include <signal.h>
+#include "gestion.h"
 
 //création de la liste des intentions
 TicketIntentionList* ticketlistint_create() {
@@ -347,4 +350,88 @@ void* client_thread2(void* arg) {
 
     printf("[CLIENT %d] Fin des actions\n", c->id);
     return NULL;
+}
+
+//thread pour la gestion dynamique (projection flexible; taux de remplissage; etc)
+void* supervisor_thread(void* arg){
+    Cinema* cinema = (Cinema*)arg;
+
+    while (1) {
+        time_t now = time(NULL);
+
+        for (int i = 0; i < cinema->num_screenings; i++) {
+            Screening* s = cinema->screenings[i];
+
+            if (s->room->for_event)
+                continue;
+
+            float occ = calculate_occupancy(s);
+
+            // check de la saturation
+            if (occ >= 0.9f && s->can_change) {
+                lock_screening(s);
+                printf("[SUPERVISOR] ALERTE : Séance %d à %.2f%%\n",s->id, occ * 100);
+                notify_admin_threshold(s);
+                //lancement du signal
+                raise(SIGUSR2);
+            }
+
+            // gestion de la projection flexible
+            if (difftime(now, s->created_at) >= 120 && can_switch_film(s)) {
+                Movie* best = NULL;
+                int max_demand = 0;
+
+                //recherche du film avec la plus grande demande (juste pour le test, on peut bien avoir une liste et laiser admin choisir)
+                for (int m = 0; m < cinema->num_movies; m++) {
+                    int demand = cinema->statistics->tickets_by_movie[cinema->movies[m]->id];
+                    if (demand > max_demand &&
+                        cinema->movies[m]->id != s->movie->id) {
+                        best = cinema->movies[m];
+                        max_demand = demand;
+                    }
+                }
+
+                if (best) {
+                    printf("[SUPERVISOR] Changement film séance %d : %s → %s\n",s->id, s->movie->title, best->title);
+                    //changement de film sur la mm séance
+                    switch_film(s, best);
+                    ticket_movie_changed(cinema,s);
+                    raise(SIGUSR2);
+                }
+            }
+        }
+
+        sleep(1);
+    }
+}
+
+
+//thread pour la gestion des ressources soumis à un temps d'occupation
+void* scheduler_thread(void* arg){
+    Cinema* cinema = (Cinema*)arg;
+    int ended_screenings[30] = {0};
+
+    while (1) {
+        time_t now = time(NULL);
+        //check de toutes les seances
+        for (int i = 0; i < cinema->num_screenings; i++) {
+            Screening* s = cinema->screenings[i];
+
+            if (s->room->for_event){
+                continue;
+            }
+                
+            time_t end_time =s->start_time + s->movie->duration_minutes * 60;
+
+            if (now >= end_time && !ended_screenings[s->id]) {
+                printf("[SCHEDULER] Fin séance %d (%s)\n",s->id, s->movie->title);
+                //on remet les seats availables
+                liberation_places_at_end_screening(s);
+                ended_screenings[s->id] = 1;
+                raise(SIGUSR1);
+            }
+        }
+
+        sleep(1);
+    }
 }

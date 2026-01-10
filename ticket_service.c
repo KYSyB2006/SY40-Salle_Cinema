@@ -36,6 +36,21 @@ TicketResult purchase_ticket(Cinema* cinema, int screening_id, const char* name,
         }
     }
 
+    //Verification du screening
+    time_t now=time(NULL);
+    if(now>=screening->start_time){
+       fprintf(stderr,"Séance a déjà commencée\n");
+        pthread_mutex_unlock(&ticket_mutex);
+        pthread_mutex_unlock(&seat_mutex);
+        return INVALID; 
+    }
+    if(screening->can_change==0){
+        fprintf(stderr,"Séance pleine\n");
+        pthread_mutex_unlock(&ticket_mutex);
+        pthread_mutex_unlock(&seat_mutex);
+        return INVALID;
+    }
+
     Room* room = screening->room;
 
     Seat* seat=NULL;
@@ -95,8 +110,8 @@ TicketResult purchase_ticket(Cinema* cinema, int screening_id, const char* name,
     //statistiques
     cinema->statistics->total_tickets_sold += 1;
     cinema->statistics->total_revenue += screening->price;
-    cinema->statistics->tickets_by_movie[ticket->screening->movie->id]++;
-    cinema->statistics->tickets_by_room[ticket->screening->room->id]++;
+    cinema->statistics->tickets_by_movie[ticket->screening->movie->id]+=1;
+    cinema->statistics->tickets_by_room[ticket->screening->room->id]+=1;
 
     pthread_mutex_unlock(&ticket_mutex);
     pthread_mutex_unlock(&seat_mutex);
@@ -139,6 +154,21 @@ TicketResult exchange_ticket(Cinema* cinema, int ticket_id, int new_screening_id
         pthread_mutex_unlock(&seat_mutex);
         fprintf(stderr, "Echange refusé : séance %d non trouvée\n", new_screening_id);
         return 0;
+    }
+
+    //Verification du screening
+    time_t now=time(NULL);
+    if(now>=new_screening->start_time){
+       fprintf(stderr,"Séance a déjà commencée\n");
+        pthread_mutex_unlock(&ticket_mutex);
+        pthread_mutex_unlock(&seat_mutex);
+        return INVALID; 
+    }
+    if(new_screening->can_change==0){
+        fprintf(stderr,"Séance pleine\n");
+        pthread_mutex_unlock(&ticket_mutex);
+        pthread_mutex_unlock(&seat_mutex);
+        return INVALID;
     }
 
     Room* new_room = new_screening->room;
@@ -196,8 +226,8 @@ TicketResult exchange_ticket(Cinema* cinema, int ticket_id, int new_screening_id
     ticket->status = TICKET_EXCHANGED;
 
     //statistiques
-    cinema->statistics->tickets_by_movie[ticket->screening->movie->id]++;
-    cinema->statistics->tickets_by_room[ticket->screening->room->id]++;
+    cinema->statistics->tickets_by_movie[ticket->screening->movie->id]+=1;
+    cinema->statistics->tickets_by_room[ticket->screening->room->id]+=1;
     cinema->statistics->total_ticket_exchanged += 1;
 
     pthread_mutex_unlock(&ticket_mutex);
@@ -267,8 +297,8 @@ int cancel_ticket(Cinema* cinema, int ticket_id) {
     //statistiques
     cinema->statistics->total_tickets_cancelled += 1;
     // cinema->statistics->total_revenue -= ticket->screening->price;
-    cinema->statistics->tickets_by_movie[ticket->screening->movie->id]--;
-    cinema->statistics->tickets_by_room[ticket->screening->room->id]--;
+    cinema->statistics->tickets_by_movie[ticket->screening->movie->id]-=1;
+    cinema->statistics->tickets_by_room[ticket->screening->room->id]-=1;
 
     pthread_mutex_unlock(&ticket_mutex);
     pthread_mutex_unlock(&seat_mutex);
@@ -298,7 +328,7 @@ int refund_ticket(Cinema* cinema, int ticket_id) {
     }
 
     //Verification du statut du billet
-    if(ticket->status != TICKET_CANCELLED){
+    if(ticket->status == TICKET_REFUNDED){
         pthread_mutex_unlock(&ticket_mutex);
         pthread_mutex_unlock(&seat_mutex);
         fprintf(stderr, "Remboursement refusé : billet %d n'est pas remboursable\n", ticket_id);
@@ -320,8 +350,8 @@ int refund_ticket(Cinema* cinema, int ticket_id) {
 
     //statistiques
     cinema->statistics->total_revenue -= ticket->screening->price;
-    cinema->statistics->tickets_by_movie[ticket->screening->movie->id]--;
-    cinema->statistics->tickets_by_room[ticket->screening->room->id]--;
+    cinema->statistics->tickets_by_movie[ticket->screening->movie->id]-=1;
+    cinema->statistics->tickets_by_room[ticket->screening->room->id]-=1;
     cinema->statistics->total_ticket_refunded += 1;
 
     pthread_mutex_unlock(&ticket_mutex);

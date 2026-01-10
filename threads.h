@@ -38,5 +38,7 @@ void* kiosk_thread(void* arg);
 void* processor_thread(void* arg);
 void* client_thread(void* arg);
 void* client_thread2(void* arg);
+void* supervisor_thread(void* arg);
+void* scheduler_thread(void* arg);
 
 #endif

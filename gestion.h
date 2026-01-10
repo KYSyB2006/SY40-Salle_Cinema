@@ -6,7 +6,11 @@
 #include <semaphore.h>
 #include <time.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <signal.h>
 #include "struct.h"
+
+extern volatile sig_atomic_t system_paused;
 
 // Structure pour les paramètres d'entrée
 typedef struct {
@@ -48,10 +52,12 @@ int can_switch_film(Screening* screening);
 int switch_film(Screening* screening, Movie* new_movie);
 void update_dynamic_schedule(Cinema* cinema);
 
-CinemaStatistics* generate_cinemastatistics(Cinema* cinema);
-void* statistics_thread(void* arg);
+//CinemaStatistics* generate_cinemastatistics(Cinema* cinema);
+//void* statistics_thread(void* arg);
 int liberation_room_after_event(Room* room);
 int liberation_places_at_end_screening(Screening* screening);
 EventReservation* event_reservation_create(Cinema* cinema, const char* eventname, Room* room, struct tm event_date, time_t start_time, float eventprice);
+
+void ticket_movie_changed(Cinema* cinema, Screening* screening);
 
 #endif
