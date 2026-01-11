@@ -10,7 +10,7 @@ EXEC2 = ticket_test
 EXEC2_SRCS = client.c test_gestion_ticket.c gestion.c alternatives.c ticket_service.c reservation_service.c threads.c 
 
 EXEC3 = main_sim
-EXEC3_SRCS = client.c main.c gestion.c alternatives.c ticket_service.c reservation_service.c threads.c alarm.c handle.c
+EXEC3_SRCS = client.c main.c gestion.c alternatives.c ticket_service.c reservation_service.c threads.c handle.c
 
 # Liste de tous les exécutables
 EXES = $(EXEC2) $(EXEC1) $(EXEC3)
